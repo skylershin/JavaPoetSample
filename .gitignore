@@ -10,3 +10,12 @@
 
 # virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
 hs_err_pid*
+.idea/misc.xml
+.idea/modules.xml
+.idea/uiDesigner.xml
+.idea/workspace.xml
+.idea/copyright/profiles_settings.xml
+.idea/dictionaries/kimjongho.xml
+.idea/inspectionProfiles/profiles_settings.xml
+.idea/inspectionProfiles/Project_Default.xml
+.idea/libraries/Maven__com_squareup_javapoet_1_7_0.xml
