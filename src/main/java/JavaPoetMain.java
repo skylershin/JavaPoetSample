@@ -1,66 +1,20 @@
 import com.squareup.javapoet.*;
-import com.sun.xml.internal.bind.api.TypeReference;
 
 import javax.lang.model.element.Modifier;
 import java.io.IOException;
 import java.lang.reflect.Type;
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Created by MunkyuShin on 5/11/16.
+ */
 
 public class JavaPoetMain {
-    private static String PACKAGE_NAME = "com.example.javapoet";
-
-    public static void main(String args[]) {
-        System.out.print("JavaPoet Test Sample\n");
-
-        // University Class
-        TypeSpec universityTypeSpec = makeUniversityClass();
-
-        // user
-        FieldSpec name = FieldSpec.builder(String.class, "name")
-                .addModifiers(Modifier.PRIVATE)
+    public static void main(String[] args) {
+        JavaFile javaFile = JavaFile.builder("com.example", generateUserType())
                 .build();
 
-        // age
-        FieldSpec age = FieldSpec.builder(Integer.class, "age")
-                .addModifiers(Modifier.PRIVATE)
-                .build();
-
-        // university
-        ClassName universityClassName = ClassName.get(PACKAGE_NAME, "User", "University");
-        FieldSpec university = FieldSpec.builder(universityClassName, "university")
-                .addModifiers(Modifier.PRIVATE)
-                .build();
-
-        // friends
-        ClassName userClassName = ClassName.get(PACKAGE_NAME, "User");
-        ClassName listClassName = ClassName.get("java.util", "List");
-        TypeName listOfUserClassName = ParameterizedTypeName.get(listClassName, userClassName);
-        FieldSpec friends = FieldSpec.builder(listOfUserClassName, "friends")
-                .addModifiers(Modifier.PRIVATE)
-                .build();
-
-        // User class
-        TypeSpec user = TypeSpec.classBuilder("User")
-                .addModifiers(Modifier.PUBLIC)
-                .addField(name)
-                .addField(age)
-                .addField(university)
-                .addField(friends)
-                .addMethod(makeGetter(String.class,"name"))
-                .addMethod(makeSetter(String.class,"name"))
-                .addMethod(makeGetter(Integer.class,"age"))
-                .addMethod(makeSetter(Integer.class,"age"))
-                .addMethod(makeGetter(listOfUserClassName, "friends"))
-                .addMethod(makeSetter(listOfUserClassName, "friends"))
-                .addMethod(makeGetter(universityClassName, "university"))
-                .addMethod(makeSetter(universityClassName, "university"))
-                .addType(universityTypeSpec)
-                .build();
-
-        // JavaFile
-        JavaFile javaFile = JavaFile.builder(PACKAGE_NAME, user)
-                .build();
-
-        // print log
         try {
             javaFile.writeTo(System.out);
         } catch (IOException e) {
@@ -68,63 +22,148 @@ public class JavaPoetMain {
         }
     }
 
-    private static TypeSpec makeUniversityClass() {
-        FieldSpec university = FieldSpec.builder(String.class, "university")
+    private static TypeSpec generateUserType() {
+        String classNameText = "User";
+        String innerClassNameText = "University";
+        List<Field> fields = new ArrayList<Field>();
+        fields.add(new Field("name", String.class));
+        fields.add(new Field("age", Integer.class));
+        TypeSpec.Builder builder = generatePOJOClass(classNameText, fields);
+
+        List<Field> innerClassFields = new ArrayList<Field>();
+        innerClassFields.add(new Field("university", String.class));
+        innerClassFields.add(new Field("major", String.class));
+
+        builder.addType(generatePOJOClass(innerClassNameText, innerClassFields).build());
+        builder = generateHavingInnerClassVariableClass(builder, innerClassNameText);
+        builder = generateHavingListVariableClass(builder, "User", "friends");
+
+        return builder.build();
+    }
+
+    private static TypeSpec.Builder generateHavingListVariableClass(TypeSpec.Builder builder, String classNameText, String listFieldName) {
+        ClassName className = ClassName.get("com.example", classNameText);
+
+        TypeName listFieldType = ParameterizedTypeName.get(ClassName.get(List.class), className);
+        FieldSpec fieldSpec = generateField(listFieldType, listFieldName);
+
+        builder.addField(fieldSpec);
+        builder.addMethod(generateGetMethod(listFieldName));
+        builder.addMethod(generateSetMethod(listFieldName));
+        return builder;
+    }
+    private static TypeSpec.Builder generateHavingInnerClassVariableClass(TypeSpec.Builder builder, String innerClassNameText) {
+        ClassName innerClassName = ClassName.get("com.example", innerClassNameText);
+        FieldSpec innerClassField = generateField(innerClassName, innerClassNameText);
+
+        builder.addField(innerClassField);
+        builder.addMethod(generateGetMethod(innerClassNameText));
+        builder.addMethod(generateSetMethod(innerClassNameText));
+
+        return builder;
+    }
+
+    private static TypeSpec.Builder generatePOJOClass(String classNameText, List<Field> fields) {
+        ClassName className = ClassName.get("com.example", classNameText);
+
+        return TypeSpec.classBuilder(className)
+                .addModifiers(Modifier.PUBLIC)
+                .addFields(generateFields(fields))
+                .addMethods(generateConstructors(fields))
+                .addMethods(generateGetSetMethods(fields));
+    }
+
+    private static List<MethodSpec> generateConstructors(List<Field> fields) {
+        List<MethodSpec> constructors = new ArrayList<MethodSpec>();
+
+        MethodSpec.Builder constructorBuilder = MethodSpec.constructorBuilder()
+                .addModifiers(Modifier.PUBLIC);
+        constructors.add(constructorBuilder.build());
+
+        for (int i = 0; i < fields.size(); i++) {
+            Field field = fields.get(i);
+            constructorBuilder
+                    .addParameter(field.getFieldType(), field.getFieldName())
+                    .addStatement("this.$N = $N", field.getFieldName(), field.getFieldName());
+            constructors.add(constructorBuilder.build());
+        }
+        return constructors;
+    }
+
+    private static List<FieldSpec> generateFields(List<Field> fields) {
+        List<FieldSpec> fieldSpecs = new ArrayList<FieldSpec>();
+        for (Field field : fields) {
+            fieldSpecs.add(generateField(field));
+        }
+        return fieldSpecs;
+    }
+
+    private static FieldSpec generateField(Field field) {
+        return FieldSpec.builder(field.getFieldType(), field.getFieldName())
                 .addModifiers(Modifier.PRIVATE)
                 .build();
-        FieldSpec major = FieldSpec.builder(String.class, "major")
+    }
+
+    private static FieldSpec generateField(TypeName typeName, String fieldName) {
+        return FieldSpec.builder(typeName, fieldName)
                 .addModifiers(Modifier.PRIVATE)
                 .build();
-
-        return TypeSpec.classBuilder("University")
-                .addField(university)
-                .addField(major)
-                .addMethod(makeGetter(String.class, "university"))
-                .addMethod(makeGetter(String.class, "major"))
-                .addMethod(makeSetter(String.class, "university"))
-                .addMethod(makeSetter(String.class, "major"))
-                .build();
     }
 
-    /**
-     * Utility Functions
-     */
-    private static MethodSpec makeSetter(Type type, String fieldName) {
-        String methodName = Character.toUpperCase(fieldName.charAt(0)) + fieldName.substring(1);
-        return MethodSpec.methodBuilder("set" + methodName)
+    private static List<MethodSpec> generateGetSetMethods(List<Field> fields) {
+        List<MethodSpec> getSets = new ArrayList<MethodSpec>();
+
+        for (Field field : fields) {
+            getSets.add(generateSetMethod(field.getFieldName()));
+            getSets.add(generateGetMethod(field.getFieldName()));
+        }
+
+        return getSets;
+    }
+
+    private static MethodSpec generateSetMethod(String fieldName) {
+        String methodName = "set" + fieldName;
+        return MethodSpec.methodBuilder(methodName)
                 .addModifiers(Modifier.PUBLIC)
-                .addParameter(type, fieldName)
                 .returns(void.class)
-                .addStatement("this.$L = $L", fieldName, fieldName)
+                .addParameter(String.class, fieldName.toLowerCase())
+                .addStatement("this.$N = $N", fieldName.toLowerCase(), fieldName.toLowerCase())
                 .build();
     }
 
-    private static MethodSpec makeGetter(Type type, String fieldName) {
-        String methodName = Character.toUpperCase(fieldName.charAt(0)) + fieldName.substring(1);
-        return MethodSpec.methodBuilder("get" + methodName)
+    private static MethodSpec generateGetMethod(String fieldName) {
+        String methoidName = "get" + fieldName;
+        return MethodSpec.methodBuilder(methoidName)
                 .addModifiers(Modifier.PUBLIC)
-                .returns(type)
-                .addStatement("return $L", fieldName)
+                .returns(String.class)
+                .addStatement("return $N", fieldName)
                 .build();
+
     }
 
-    private static MethodSpec makeSetter(TypeName typeName, String fieldName) {
-        String methodName = Character.toUpperCase(fieldName.charAt(0)) + fieldName.substring(1);
-        return MethodSpec.methodBuilder("set" + methodName)
-                .addModifiers(Modifier.PUBLIC)
-                .addParameter(typeName, fieldName)
-                .returns(void.class)
-                .addStatement("this.$L = $L", fieldName, fieldName)
-                .build();
-    }
+    private static class Field {
+        private String fieldName;
+        private Type fieldType;
 
+        public Field(String fieldName, Type fieldType) {
+            this.fieldName = fieldName;
+            this.fieldType = fieldType;
+        }
 
-    private static MethodSpec makeGetter(TypeName typeName, String fieldName) {
-        String methodName = Character.toUpperCase(fieldName.charAt(0)) + fieldName.substring(1);
-        return MethodSpec.methodBuilder("get" + methodName)
-                .addModifiers(Modifier.PUBLIC)
-                .returns(typeName)
-                .addStatement("return $L", fieldName)
-                .build();
+        public String getFieldName() {
+            return fieldName;
+        }
+
+        public void setFieldName(String fieldName) {
+            this.fieldName = fieldName;
+        }
+
+        public Type getFieldType() {
+            return fieldType;
+        }
+
+        public void setFieldType(Type fieldType) {
+            this.fieldType = fieldType;
+        }
     }
 }
